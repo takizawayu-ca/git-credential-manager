@@ -47,12 +47,7 @@ namespace GitCredentialManager.UI
                 Dispatcher.MainThread.Post(appCancelToken =>
                 {
                     AppBuilder.Configure<AvaloniaApp>()
-#if NETFRAMEWORK
-                        .UseWin32()
-                        .UseSkia()
-#else
                         .UsePlatformDetect()
-#endif
                         .LogToTrace()
                         // Workaround https://github.com/AvaloniaUI/Avalonia/issues/10296
                         // by always setting a application lifetime.
