@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using GitCredentialManager.Interop.Posix.Native;
 
 namespace GitCredentialManager
@@ -24,6 +26,7 @@ namespace GitCredentialManager
             return new PlatformInformation(osType, osVersion, cpuArch, clrVersion);
         }
 
+        [SupportedOSPlatformGuard(Constants.WindowsPlatformName)]
         public static bool IsDevBox()
         {
             if (!IsWindows())
@@ -31,7 +34,6 @@ namespace GitCredentialManager
                 return false;
             }
 
-#if NETFRAMEWORK
             // Check for machine (HKLM) registry keys for Cloud PC indicators
             // Note that the keys are only found in the 64-bit registry view
             using (Microsoft.Win32.RegistryKey hklm64 = Microsoft.Win32.RegistryKey.OpenBaseKey(Microsoft.Win32.RegistryHive.LocalMachine, Microsoft.Win32.RegistryView.Registry64))
@@ -48,11 +50,9 @@ namespace GitCredentialManager
 
                 return w365Value is not null && Guid.TryParse(partnerValue, out Guid partnerId) && partnerId == Constants.DevBoxPartnerId;
             }
-#else
-            return false;
-#endif
         }
 
+        [SupportedOSPlatformGuard(Constants.WindowsPlatformName)]
         public static bool IsWindowsBrokerSupported()
         {
             if (!IsWindows())
@@ -97,45 +97,38 @@ namespace GitCredentialManager
         /// Check if the current Operating System is macOS.
         /// </summary>
         /// <returns>True if running on macOS, false otherwise.</returns>
+        [SupportedOSPlatformGuard(Constants.MacOSPlatformName)]
         public static bool IsMacOS()
         {
-#if NETFRAMEWORK
-            return Environment.OSVersion.Platform == PlatformID.MacOSX;
-#else
-            return RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
-#endif
+            return OperatingSystem.IsMacOS();
         }
 
         /// <summary>
         /// Check if the current Operating System is Windows.
         /// </summary>
         /// <returns>True if running on Windows, false otherwise.</returns>
+        [SupportedOSPlatformGuard(Constants.WindowsPlatformName)]
         public static bool IsWindows()
         {
-#if NETFRAMEWORK
-            return Environment.OSVersion.Platform == PlatformID.Win32NT;
-#else
-            return RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
-#endif
+            return OperatingSystem.IsWindows();
         }
 
         /// <summary>
         /// Check if the current Operating System is Linux-based.
         /// </summary>
         /// <returns>True if running on a Linux distribution, false otherwise.</returns>
+        [SupportedOSPlatformGuard(Constants.LinuxPlatformName)]
         public static bool IsLinux()
         {
-#if NETFRAMEWORK
-            return Environment.OSVersion.Platform == PlatformID.Unix;
-#else
-            return RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
-#endif
+            return OperatingSystem.IsLinux();
         }
 
         /// <summary>
         /// Check if the current Operating System is POSIX-compliant.
         /// </summary>
         /// <returns>True if running on a POSIX-compliant Operating System, false otherwise.</returns>
+        [SupportedOSPlatformGuard(Constants.LinuxPlatformName)]
+        [SupportedOSPlatformGuard(Constants.MacOSPlatformName)]
         public static bool IsPosix()
         {
             return IsMacOS() || IsLinux();
@@ -145,6 +138,7 @@ namespace GitCredentialManager
         /// Ensure the current Operating System is macOS, fail otherwise.
         /// </summary>
         /// <exception cref="PlatformNotSupportedException">Thrown if the current OS is not macOS.</exception>
+        [SupportedOSPlatformGuard(Constants.MacOSPlatformName)]
         public static void EnsureMacOS()
         {
             if (!IsMacOS())
@@ -157,6 +151,7 @@ namespace GitCredentialManager
         /// Ensure the current Operating System is Windows, fail otherwise.
         /// </summary>
         /// <exception cref="PlatformNotSupportedException">Thrown if the current OS is not Windows.</exception>
+        [SupportedOSPlatformGuard(Constants.WindowsPlatformName)]
         public static void EnsureWindows()
         {
             if (!IsWindows())
@@ -169,6 +164,7 @@ namespace GitCredentialManager
         /// Ensure the current Operating System is Linux-based, fail otherwise.
         /// </summary>
         /// <exception cref="PlatformNotSupportedException">Thrown if the current OS is not Linux-based.</exception>
+        [SupportedOSPlatformGuard(Constants.LinuxPlatformName)]
         public static void EnsureLinux()
         {
             if (!IsLinux())
@@ -181,6 +177,8 @@ namespace GitCredentialManager
         /// Ensure the current Operating System is POSIX-compliant, fail otherwise.
         /// </summary>
         /// <exception cref="PlatformNotSupportedException">Thrown if the current OS is not POSIX-compliant.</exception>
+        [SupportedOSPlatformGuard(Constants.LinuxPlatformName)]
+        [SupportedOSPlatformGuard(Constants.MacOSPlatformName)]
         public static void EnsurePosix()
         {
             if (!IsPosix())
@@ -193,11 +191,9 @@ namespace GitCredentialManager
         {
             if (IsWindows())
             {
-#if NETFRAMEWORK
                 var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
                 var principal = new System.Security.Principal.WindowsPrincipal(identity);
                 return principal.IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
-#endif
             }
             else if (IsPosix())
             {
@@ -283,9 +279,6 @@ namespace GitCredentialManager
                 }
             }
 
-#if NETFRAMEWORK
-            return null;
-#else
             //
             // We cannot determine the absolute file path from argv[0]
             // (how we were launched), so let's now try to extract the
@@ -295,7 +288,6 @@ namespace GitCredentialManager
             //
             FileSystemInfo fsi = File.ResolveLinkTarget("/proc/self/exe", returnFinalTarget: false);
             return fsi?.FullName;
-#endif
         }
 
         private static string GetMacOSEntryPath()
@@ -364,12 +356,11 @@ namespace GitCredentialManager
             // However, we still need to use the old method for Windows on .NET Framework
             // and call into the Win32 API to get the correct version (regardless of app
             // compatibility settings).
-#if NETFRAMEWORK
             if (IsWindows() && RtlGetVersionEx(out RTL_OSVERSIONINFOEX osvi) == 0)
             {
                 return $"{osvi.dwMajorVersion}.{osvi.dwMinorVersion} (build {osvi.dwBuildNumber})";
             }
-#endif
+
             if (IsWindows() || IsMacOS())
             {
                 return Environment.OSVersion.Version.ToString();
@@ -459,9 +450,6 @@ namespace GitCredentialManager
 
         private static string GetCpuArchitecture()
         {
-#if NETFRAMEWORK
-            return Environment.Is64BitOperatingSystem ? "x86-64" : "x86";
-#else
             switch (RuntimeInformation.OSArchitecture)
             {
                 case Architecture.Arm:
@@ -475,16 +463,11 @@ namespace GitCredentialManager
                 default:
                     return RuntimeInformation.OSArchitecture.ToString();
             }
-#endif
         }
 
         private static string GetClrVersion()
         {
-#if NETFRAMEWORK
-            return $".NET Framework {Environment.Version}";
-#else
             return RuntimeInformation.FrameworkDescription;
-#endif
         }
 
         #endregion
