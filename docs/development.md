@@ -54,7 +54,7 @@ To build from the command line, run:
 dotnet build -c LinuxDebug
 ```
 
-If you want to build for a specific architecture, you can provide `linux-x64` or `linux-arm64` as the runtime:
+If you want to build for a specific architecture, you can provide `linux-x64` or `linux-arm64` or `linux-arm` as the runtime:
 
 ```shell
 dotnet build -c LinuxDebug -r linux-arm64
